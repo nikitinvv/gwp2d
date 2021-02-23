@@ -1,4 +1,4 @@
-from gwp import solver
+from gwp2d import solver
 import numpy as np
 
 n = 256

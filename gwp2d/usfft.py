@@ -1,6 +1,6 @@
 import cupy as cp
 import numpy as np
-from gwp import util
+from gwp2d import util
 
 class Usfft():
     """Provides unequally-spaced fast fourier transforms (USFFT).

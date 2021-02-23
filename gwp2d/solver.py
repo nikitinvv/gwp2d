@@ -1,8 +1,11 @@
 import numpy as np
 import cupy as cp
-from gwp import util
-from gwp import usfft
+from gwp2d import util
+from gwp2d import usfft
 import matplotlib.pyplot as plt
+
+mempool = cp.get_default_memory_pool()
+pinned_mempool = cp.get_default_pinned_memory_pool()
 
 class Solver():
     """Provides forward and adjoint operators for Gaussian Wave-packet (GWP) decompositon on
@@ -58,7 +61,7 @@ class Solver():
             indsy, indsx = cp.meshgrid(cp.arange(yst, yst+L0[k]), cp.arange(xst, xst+L1[k]), indexing='ij')
             inds[k] = (indsx+indsy*L1[-1]).astype('int32').flatten()
 
-        # 3d USFFT plan
+        # 2D USFFT plan
         U = usfft.Usfft(n, eps)
 
         # find spectrum subregions for each rotated box
@@ -92,7 +95,11 @@ class Solver():
         self.xi_cent = xi_cent
         self.subregion = subregion
 
-    def subregion_ids_fwd(self, ang):
+        # free cupy pools
+        # mempool.free_all_blocks()
+        # pinned_mempool.free_all_blocks()
+
+    def subregion_ids(self, ang):
         """
         Calculate indices for the subregion in the global grid with wrapping 
         for the gathering operation in the forward transform
@@ -140,27 +147,6 @@ class Solver():
         xr /= cp.array(self.fgridshape)
         return xr
 
-    def subregion_ids_adj(self, ang):
-        """
-        Calculate indices for the subregion in the global grid with wrapping.
-        Parameters
-        ----------
-        ang : float32
-            Box orientation angle
-        Returns
-        -------        
-        xg: float32
-            1d flatten array of coordinates
-        """        
-        yg = cp.arange(self.subregion[ang, 0],
-                       self.subregion[ang, 1]) % self.fgridshape[0]
-        xg = cp.arange(self.subregion[ang, 2],
-                       self.subregion[ang, 3]) % self.fgridshape[1]
-        [yg, xg] = cp.meshgrid(yg, xg, indexing='ij')
-        xg = cp.array([yg.flatten(),xg.flatten()]).swapaxes(0,1)
-        xg = xg[:, 0]*self.fgridshape[1]+xg[:, 1]
-        return xg
-
     def coordinates_adj(self, ang):
         """
         Compute coordinates of the global grid 
@@ -175,14 +161,12 @@ class Solver():
             (y,x) array of coordinates
         """
         # form 1D array of indeces
-        yg = cp.arange(self.subregion[ang, 0],
-                       self.subregion[ang, 1])
-        xg = cp.arange(self.subregion[ang, 2],
-                       self.subregion[ang, 3])
-        [yg, xg] = cp.meshgrid(yg, xg, indexing='ij')
-        xg = cp.array([yg.flatten(),xg.flatten()]).swapaxes(0,1)
+        xr =  cp.indices((self.subregion[ang, 1]-self.subregion[ang, 0],
+                    self.subregion[ang, 3]-self.subregion[ang, 2]))
+        xr[0] += self.subregion[ang, 0]-self.fgridshape[0]//2
+        xr[1] += self.subregion[ang, 2]-self.fgridshape[1]//2
+        xr = xr.reshape(2,-1).swapaxes(0,1)
         # rotate and shift
-        xr = (xg - cp.array(self.fgridshape)/2)
         xr = util.rotate(xr, self.theta[ang], reverse=True)
         xr[:, 1] -= self.xi_cent[-1]
         # switch to [-1/2,1/2) interval w.r.t. box
@@ -194,7 +178,7 @@ class Solver():
         Parameters
         ----------
         f : [N,N,N] complex64
-            3D function in the space domain
+            2D function in the space domain
         Returns
         -------
         coeffs : [K](Nangles,L3,L0,L1) complex64
@@ -202,7 +186,7 @@ class Solver():
             defined on box grids with sizes [L3[k],L0[k],L1[k]], k=0:K
         """
         print('fwd transform')
-        # 1) Compensate for the USFFT kernel function in the space domain and apply 3D FFT
+        # 1) Compensate for the USFFT kernel function in the space domain and apply 2D FFT
         F = self.U.compfft(cp.array(f))
 
         # allocate memory for coefficeints
@@ -217,7 +201,7 @@ class Solver():
             # 2) Interpolation to the local box grid.
             # Gathering operation from the global to local grid.
             # extract ids of the global spectrum subregion contatining the box
-            [idsy, idsx] = self.subregion_ids_fwd(ang)
+            [idsy, idsx] = self.subregion_ids(ang)
             # calculate box coordinates in the space domain
             xr = self.coordinates_fwd(ang)
             # gather values to the box grid
@@ -236,6 +220,10 @@ class Solver():
                 coeffs[k][ang] = fcoeffs.get()
         #plt.gca().set_aspect('equal', adjustable='box')
         #plt.savefig('geometry/'+str(self.nangles)+'.png',dpi=600)            
+
+        # free cupy pools
+        # mempool.free_all_blocks()
+        # pinned_mempool.free_all_blocks()
         return coeffs
 
     def adj(self, coeffs):
@@ -253,7 +241,7 @@ class Solver():
         print('adj transform')
 
         # build spectrum by using gwp coefficients
-        F = cp.zeros(int(np.prod(self.fgridshape)), dtype="complex64")
+        F = cp.zeros(self.fgridshape, dtype="complex64")
         # loop over box orientations
         for ang in range(0,self.nangles):        
             print('angle', ang)
@@ -268,8 +256,6 @@ class Solver():
                 # broadcast values to smaller boxes, multiply by the gwp kernel function
                 g[self.inds[k]] += self.gwpf[k]*fcoeffs.flatten()
             g = g.reshape(self.boxshape[-1])
-            import dxchange            
-            dxchange.write_tiff(g.real.get(), 'tt', overwrite=True)
                 
             # 2) Interpolation to the global grid
             # Conventional scattering operation from the global to local grid is replaced
@@ -277,13 +263,14 @@ class Solver():
             # calculate global grid coordinates in the space domain
             xr = self.coordinates_adj(ang)
             # extract ids of the global spectrum subregion contatining the box
-            ids = self.subregion_ids_adj(ang)
+            [idsy,idsx] = self.subregion_ids(ang)            
             # gathering to the global grid
-            F[ids] += self.U.gather(g, xr, g.shape)
-        import dxchange            
-        dxchange.write_tiff(F.reshape(self.fgridshape).real.get(), 't', overwrite=True)
-        # 3) apply 3D IFFT, compensate for the USFFT kernel function in the space domain
+            F[cp.ix_(idsy, idsx)] += self.U.gather(g, xr, g.shape).reshape(len(idsy),len(idsx))
+        # 3) apply 2D IFFT, compensate for the USFFT kernel function in the space domain
         f = self.U.ifftcomp(
             F.reshape(self.fgridshape)).get().astype('complex64')
 
+        # free cupy pools
+        # mempool.free_all_blocks()
+        # pinned_mempool.free_all_blocks()
         return f

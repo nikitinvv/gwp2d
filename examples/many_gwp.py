@@ -1,8 +1,8 @@
-from gwp import solver
+from gwp2d import solver
 import numpy as np
 import dxchange
 
-n = 256
+n = 512
 nangles = 14
 alpha = 1
 beta = 3
