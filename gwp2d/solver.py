@@ -2,7 +2,7 @@ import numpy as np
 import cupy as cp
 from gwp2d import util
 from gwp2d import usfft
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 mempool = cp.get_default_memory_pool()
 pinned_mempool = cp.get_default_pinned_memory_pool()
@@ -12,12 +12,19 @@ class Solver():
     GPU with using cupy library. For details see http://www.mathnet.ru/links/f0cbda0c8155c9c4d0ff6dd015c9ec78/vmp881.pdf
     """
 
-    def __init__(self, n, nangles, alpha, beta, eps):
+    def __init__(self, n, nangles, alpha, beta, eps, levels=None):
         # init box parameters for covering the spectrum (see paper)
         nf_start = np.int32(np.log2(n/64)+0.5)
         K = 3*nf_start
         step = (nf_start+1)/(K-1)
-        nf = 2**(nf_start-range(K)*step)
+        if(levels==None):
+            nf = 2**(nf_start-range(K)*step)
+        else:
+            levels = np.array(levels) 
+            levels = np.sort(levels[levels<K])            
+            nf = 2**(nf_start-levels*step)
+            K = len(levels)
+            print('Set manual levels', levels)
         if K == 0:
             nf = np.array([0.5])
             K = 1

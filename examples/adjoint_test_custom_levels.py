@@ -1,0 +1,19 @@
+from gwp2d import solver
+import numpy as np
+
+n = 256
+nangles = 16
+alpha = 1
+beta = 3
+ep = 1e-2
+cl = solver.Solver(n, nangles, alpha, beta, ep, [2,0])
+f = np.random.random([n, n]).astype('float32')
+coeffs = cl.fwd(f)
+fr = cl.adj(coeffs)
+
+s0 = np.sum(f*np.conj(fr))
+s1 = np.float32(0)
+for k in range(len(coeffs)):
+    s1 += np.sum(coeffs[k]*np.conj(coeffs[k]))
+
+print('Adjoint test <fwd(f),fwd(f)> ?= <f,adj(fwd(f))> :', s0, '?=', s1)
