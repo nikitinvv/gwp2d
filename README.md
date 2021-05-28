@@ -21,3 +21,9 @@ many_gwp.py - construct many gwp in one image for given angles and box levels by
 
 
 synthetic.py - example of synthetic data decomposition
+
+adjoint_test_rect.py - perform the adjoint test for the forward and adjoint GWP operators in case of rectangular grid
+
+gwp_rect.py - construct many gwp in one image for given angles and box levels by using the adjoint operator in case of rectangular grid
+
+synthetic_rect.py - example of synthetic data decomposition in case of rectangular grid
