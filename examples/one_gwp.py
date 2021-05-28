@@ -22,7 +22,8 @@ coeffs = cl.fwd(f)
 cshape = coeffs[level][0].shape
 for k in range(len(coeffs)):
     coeffs[k][:] = 0
-coeffs[level][ang, cshape[0]//2, cshape[1]//2] = 1
+# coeffs[level][ang, cshape[0]//2, cshape[1]//2] = 1
+coeffs[level][ang, cshape[0]//2, cshape[1]//2+16] = 1
 
 # recover gwp
 fr = cl.adj(coeffs)

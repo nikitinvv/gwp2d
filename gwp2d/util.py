@@ -2,13 +2,14 @@ import numpy as np
 import cupy as cp
 import os
 import struct
+import matplotlib.pyplot as plt
 
 
 
 def rotate(x, theta, reverse=False):
     """Rotate coordinates with respect to the angle theta
     """
-    R = np.array([[cp.cos(theta), -cp.sin(theta)],
+    R = cp.array([[cp.cos(theta), -cp.sin(theta)],
                   [cp.sin(theta), cp.cos(theta)]])
     if(reverse):
         R = R.swapaxes(0, 1)
@@ -34,3 +35,14 @@ def checkerboard(array, inverse=False):
             array *= g(array.shape[-1] // 2)
         array = cp.moveaxis(array, -1, i)
     return array
+
+
+def mplt(f):
+    plt.subplot(211)
+    plt.imshow(f.real.get())
+    # plt.colorbar()
+    plt.subplot(212)
+    plt.imshow(f.imag.get())
+    # plt.colorbar()
+    
+    plt.show()
