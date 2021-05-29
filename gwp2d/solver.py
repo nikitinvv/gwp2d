@@ -2,9 +2,8 @@ import numpy as np
 import cupy as cp
 from gwp2d import util
 from gwp2d import usfft
-
+from collections import defaultdict
 import matplotlib.pyplot as plt
-
 
 mempool = cp.get_default_memory_pool()
 pinned_mempool = cp.get_default_pinned_memory_pool()
@@ -221,8 +220,46 @@ class Solver():
                 xrm -= cp.array([[0.5*k, 0.5*j]])
                 xrm = util.rotate(xrm, -self.theta[ang])
                 # shift in space
-                shifts[ang, l] = (xrm[0]-xrm1[0])
+                shifts[ang, l] = xrm[0]-xrm1[0]
         return shifts
+
+    def mergecoeffs(self,coeffs):
+        for l in range(self.boxshape.shape[0]):
+            y = cp.arange(-self.boxshape[l, 0]//2,self.boxshape[l, 0]//2)/self.boxshape[l, 0]
+            x = cp.arange(-self.boxshape[l, 1]//2,self.boxshape[l, 1]//2)/self.boxshape[l, 1]
+            [y, x] = cp.meshgrid(y, x, indexing='ij')
+            yx = cp.array([y.flatten(), x.flatten()]).astype('float32').swapaxes(0, 1)
+            # create a big array for all coeffs with coordinates of the first region
+            coeffsall = np.zeros([len(coeffs)*len(coeffs[0])*self.boxshape[l, 0], len(
+                coeffs)*len(coeffs[0])*self.boxshape[l, 1]], dtype='complex64')# could be done smaller
+            for ang in range(self.nangles):                
+                # fill the big array
+                coeffsall[:] = 0
+                for k in range(len(coeffs)):
+                    for j in range(len(coeffs[0])):
+                        # switch to the first box coordinate system
+                        xrm = util.rotate(yx, self.theta[ang])
+                        xrm += cp.array([[0.5*k, 0.5*j]])
+                        xrm = util.rotate(xrm, -self.theta[ang])
+                        xrm[:, 0] *= self.boxshape[l, 0]
+                        xrm[:, 1] *= self.boxshape[l, 1]
+                        # find closest point in the first region
+                        xrm = cp.round(xrm).astype('int32').get()                        
+                        coeffsall[coeffsall.shape[0]//2+xrm[:, 0],
+                                  coeffsall.shape[1]//2+xrm[:, 1]] += coeffs[k][j][l][ang].flatten()
+                # broadcast from the big array                                  
+                for k in range(len(coeffs)):
+                    for j in range(len(coeffs[0])):
+                        xrm = util.rotate(yx, self.theta[ang])
+                        # switch to the first box coordinate system                        
+                        xrm += cp.array([[0.5*k, 0.5*j]])
+                        xrm = util.rotate(xrm, -self.theta[ang])
+                        xrm[:, 0] *= self.boxshape[l, 0]
+                        xrm[:, 1] *= self.boxshape[l, 1]
+                        # find closest point in the first region
+                        xrm = cp.round(xrm).astype('int32').get()
+                        coeffs[k][j][l][ang] = coeffsall[coeffsall.shape[0]//2+xrm[:, 0],coeffsall.shape[1]//2+xrm[:, 1]].reshape(self.boxshape[l]) 
+        return coeffs                
 
     def fwdmany(self, f):
         n = self.fgridshape[0]//2
@@ -236,6 +273,7 @@ class Solver():
                 shifts = self.takeshifts(k, j)
                 # decompostion
                 coeffs[k][j] = self.fwd(f[k*n:(k+1)*n, j*n:(j+1)*n], shifts)
+        coeffs = self.mergecoeffs(coeffs)
         return coeffs
 
     def adjmany(self, coeffs):
@@ -294,7 +332,7 @@ class Solver():
                 fcoeffs = util.checkerboard(cp.fft.ifftn(
                     util.checkerboard(fcoeffs), norm='ortho'), inverse=True)
                 fcoeffs *= cp.exp(-1j*self.phase[k])
-                
+
                 if(shifts is not None):
                     # shift wrt region in rectangular grid
                     fcoeffs = util.checkerboard(cp.fft.fftn(

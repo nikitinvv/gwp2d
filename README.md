@@ -27,3 +27,5 @@ adjoint_test_rect.py - perform the adjoint test for the forward and adjoint GWP 
 gwp_rect.py - construct many gwp in one image for given angles and box levels by using the adjoint operator in case of rectangular grid
 
 synthetic_rect.py - example of synthetic data decomposition in case of rectangular grid
+
+real_rect.py - example of real data decomposition in case of rectangular grid
