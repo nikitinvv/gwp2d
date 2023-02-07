@@ -1,0 +1,12 @@
+MANIFEST.in
+README.md
+setup.py
+_skbuild/linux-x86_64-3.9/cmake-install/src/tomovector/__init__.py
+_skbuild/linux-x86_64-3.9/cmake-install/src/tomovector/_radonusfft.so
+_skbuild/linux-x86_64-3.9/cmake-install/src/tomovector/radonusfft.py
+_skbuild/linux-x86_64-3.9/cmake-install/src/tomovector/solver_tomo.py
+src/tomovector.egg-info/PKG-INFO
+src/tomovector.egg-info/SOURCES.txt
+src/tomovector.egg-info/dependency_links.txt
+src/tomovector.egg-info/not-zip-safe
+src/tomovector.egg-info/top_level.txt

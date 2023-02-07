@@ -1,0 +1,9 @@
+# ninja log v5
+0	105	1675740143555723955	src/cuda/CMakeFiles/radonusfft.dir/radonusfftPYTHON_wrap.cxx	1d53cc8143b4c954
+0	105	1675740143555723955	src/cuda/radonusfft.py	1d53cc8143b4c954
+0	105	1675740143555723955	/home/VNIKITIN/tomovector/_skbuild/linux-x86_64-3.9/cmake-build/src/cuda/CMakeFiles/radonusfft.dir/radonusfftPYTHON_wrap.cxx	1d53cc8143b4c954
+0	105	1675740143555723955	/home/VNIKITIN/tomovector/_skbuild/linux-x86_64-3.9/cmake-build/src/cuda/radonusfft.py	1d53cc8143b4c954
+106	549	1675740143998729758	src/cuda/CMakeFiles/radonusfft.dir/CMakeFiles/radonusfft.dir/radonusfftPYTHON_wrap.cxx.o	e7f2f5b184fa14e9
+106	721	1675740144170732012	src/cuda/CMakeFiles/radonusfft.dir/radonusfft.cu.o	3b296f5f8183cf2a
+721	766	1675740144215732601	src/cuda/_radonusfft.so	272faa2270c9f249
+766	772	0	CMakeFiles/install.util	b4290133defd2163
